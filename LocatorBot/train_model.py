@@ -20,7 +20,7 @@ def save_model_and_classes(model, class_names, path="models/country_classifier.p
     print(f"Model and class names saved to {path}")
 
 
-def load_model_and_classes(path="models/country_classifier.pth", device=DEVICE):
+def load_model_and_classes(path="models/efficientnet_b0.pth", device=DEVICE):
     """
     Load the trained model and class names from a file.
     Automatically detects the number of classes from the checkpoint.
@@ -28,8 +28,15 @@ def load_model_and_classes(path="models/country_classifier.pth", device=DEVICE):
     checkpoint = torch.load(path, map_location=device)
     num_classes = len(checkpoint["class_names"])  # Detect the number of classes
 
+    # Adjusted architecture to match the saved model
     model = resnet18(weights=None)
-    model.fc = nn.Linear(model.fc.in_features, num_classes)
+    model.fc = nn.Sequential(
+        nn.Linear(model.fc.in_features, 512),
+        nn.ReLU(),
+        nn.Dropout(p=0.5),
+        nn.Linear(512, num_classes)
+    )
+
     model.load_state_dict(checkpoint["model_state_dict"])
     model = model.to(device)
     model.eval()
@@ -93,8 +100,8 @@ if __name__ == '__main__':
     print(f"Classes: {class_names}")
 
     # Split dataset into train, val, and test
-    train_size = int(0.2 * len(dataset))
-    val_size = int(0.05 * len(dataset))
+    train_size = int(0.7 * len(dataset))
+    val_size = int(0.15 * len(dataset))
     test_size = len(dataset) - train_size - val_size
     train_dataset, val_dataset, test_dataset = random_split(dataset, [train_size, val_size, test_size])
     print(f"Dataset split: {train_size} train, {val_size} val, {test_size} test")
@@ -107,7 +114,12 @@ if __name__ == '__main__':
     # Initialize the model
     print("Initializing model...")
     model = resnet18(weights="IMAGENET1K_V1")
-    model.fc = nn.Linear(model.fc.in_features, len(class_names))
+    model.fc = nn.Sequential(
+        nn.Linear(model.fc.in_features, 512),
+        nn.ReLU(),
+        nn.Dropout(p=0.5),
+        nn.Linear(512, len(class_names))
+    )
     model = model.to(DEVICE)
 
     # Define loss function and optimizer
