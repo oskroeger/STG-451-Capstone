@@ -9,9 +9,17 @@ venv/
 # Jupyter Notebook checkpoints
 .ipynb_checkpoints/
 
+# Ignore Jupyter Notebooks
+*.ipynb
+
+
 # System files
 .DS_Store
 Thumbs.db
 
 # Ignore dataset folder
 dataset/
+
+# Ignore model files
+*.pth
+models/
