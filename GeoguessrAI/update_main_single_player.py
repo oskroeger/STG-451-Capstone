@@ -13,10 +13,40 @@ from geoguessr_bot import GeoBot
 load_dotenv()
 client = OpenAI()
 
+def check_game_over():
+    """
+    Detects if the GeoGuessr duel has ended by comparing the current screen 
+    with the reference end screen.
+    """
+    if not os.path.exists("end_screen_reference.png"):
+        print("Error: 'end_screen_reference.png' not found. Run capture script first.")
+        return False
+
+    # Capture the current bottom quarter of the screen (excluding last 100 pixels)
+    screen_width, screen_height = pyautogui.size()
+    top = screen_height - (screen_height // 4)  # Start of bottom quarter
+    height = (screen_height // 4) - 100  # Exclude bottom 100 pixels
+    region = (0, top, screen_width, height)
+
+    current_screen = pyautogui.screenshot(region=region)
+    
+    # Load reference image
+    reference_screen = Image.open("end_screen_reference.png")
+
+    # Compute difference
+    diff = ImageChops.difference(reference_screen, current_screen)
+
+    # If no significant difference, we assume the game is over
+    if diff.getbbox() is None:
+        print("End screen detected! Game over.")
+        return True
+    return False
+
 def wait_for_transition(bot):
     """
     Waits until the game transitions to the results screen.
     This is determined by detecting a significant change in the minimap area.
+    After waiting 15 seconds, it checks if the game has ended before continuing.
     """
     print("Waiting for the round to transition...")
 
@@ -34,9 +64,17 @@ def wait_for_transition(bot):
 
         # If there's a noticeable difference, the map likely changed (transition detected)
         if diff.getbbox() is not None:
-            print("Transition detected! Waiting 15 seconds before continuing...")
-            sleep(15)  # Additional wait after transition
-            break
+            print("Transition detected! Waiting 15 seconds before checking if game ended...")
+            sleep(15)  # Wait for full transition before checking game status
+            
+            # **Check if the game has ended**
+            if check_game_over():
+                print("Game over detected! Stopping bot.")
+                return True  # Signal that the game is over
+            
+            break  # Exit transition loop if game isn't over
+
+    return False  # Game is still active, continue playing
 
 def play_turn(bot: GeoBot, plot: bool = False):
     """
@@ -66,12 +104,17 @@ def play_turn(bot: GeoBot, plot: bool = False):
     # **NEW: Wait 2 seconds before checking for transition**
     sleep(2)
 
-    # Wait for the transition to the next screen
-    wait_for_transition(bot)
+    # Press enter again to get rid of chat
+    pyautogui.press("enter")
 
-def main(turns=5, plot=False):
+    # Wait for the transition and check if game is over
+    game_over = wait_for_transition(bot)
+    
+    return game_over  # Return whether the game ended
+
+def main(plot=False):
     """
-    Main function to run the GeoGuessr bot for multiple turns.
+    Main function to run the GeoGuessr bot indefinitely until the duel ends.
     """
     if "screen_regions.yaml" not in os.listdir():
         screen_regions = get_coords(players=1)
@@ -80,9 +123,16 @@ def main(turns=5, plot=False):
             screen_regions = yaml.safe_load(f)
 
     bot = GeoBot(screen_regions, player=1)
-    for turn in range(turns):
-        print(f"\nTurn {turn + 1}/{turns}")
-        play_turn(bot, plot=plot)
+    
+    turn = 0
+    while True:  # Run indefinitely until the game ends
+        turn += 1
+        print(f"\nTurn {turn}")
+        
+        game_over = play_turn(bot, plot=plot)
+        
+        if game_over:
+            break  # Stop playing if the game has ended
 
 if __name__ == "__main__":
-    main(turns=5, plot=True)
+    main(plot=True)
