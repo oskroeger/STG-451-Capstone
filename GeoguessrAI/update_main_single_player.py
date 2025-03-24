@@ -1,6 +1,8 @@
 import pyautogui
 import yaml
 import os
+import io
+import base64
 from time import sleep
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -11,7 +13,32 @@ from geoguessr_bot import GeoBot
 
 # Load environment variables
 load_dotenv()
-client = OpenAI()
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+def image_to_base64(image: Image.Image) -> str:
+    buffered = io.BytesIO()
+    image.save(buffered, format="PNG")
+    return base64.b64encode(buffered.getvalue()).decode("utf-8")
+
+def ask_license_plate_type(screenshot: Image.Image) -> str:
+    base64_image = image_to_base64(screenshot)
+
+    response = client.chat.completions.create(
+        model="gpt-4-turbo",
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": "What type of license plate is in this image? (State/country if possible)"},
+                    {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{base64_image}"}}
+                ]
+            }
+        ],
+        max_tokens=100,
+    )
+
+    return response.choices[0].message.content
+
 
 def check_game_over():
     """
@@ -82,6 +109,13 @@ def play_turn(bot: GeoBot, plot: bool = False):
     """
     # Capture a screenshot of the game
     screenshot = pyautogui.screenshot(region=bot.screen_xywh)
+
+    # *** NEW: Ask about license plate ***
+    try:
+        license_plate_info = ask_license_plate_type(screenshot)
+        print("License Plate Info:", license_plate_info)
+    except Exception as e:
+        print("Failed to ask about license plate:", e)
 
     # Resize the screenshot to reduce model processing time
     resized_screenshot = screenshot.resize((screenshot.width // 4, screenshot.height // 4), Image.Resampling.LANCZOS)

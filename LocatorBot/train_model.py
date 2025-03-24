@@ -71,6 +71,26 @@ def predict_country(model, class_names, image_tensor):
     return predicted_country, coordinates
 
 
+def predict_country_ranked(model, class_names, image_tensor, top_k=5):
+    """
+    Predict the top-k countries with probabilities and their coordinates.
+    Returns a list of (country, probability, (lat, lon)) tuples.
+    """
+    from country_coordinates import country_coords
+
+    with torch.no_grad():
+        outputs = model(image_tensor)
+        probabilities = torch.softmax(outputs, dim=1)
+        top_probs, top_indices = torch.topk(probabilities, k=top_k)
+
+        results = []
+        for prob, idx in zip(top_probs[0], top_indices[0]):
+            country = class_names[idx.item()]
+            coords = country_coords.get(country, (0.0, 0.0))
+            results.append((country.lower(), prob.item(), coords))  # lowercase for matching
+        return results
+
+
 # Main block for training logic
 if __name__ == '__main__':
     from torch.utils.data import DataLoader, random_split

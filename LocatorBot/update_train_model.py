@@ -2,7 +2,7 @@ import os
 import torch
 import torch.nn as nn
 from torchvision import transforms, datasets
-from torchvision.models import efficientnet_v2_s
+from torchvision.models import efficientnet_v2_l
 from torch.utils.data import DataLoader, random_split, WeightedRandomSampler
 from PIL import Image
 import numpy as np
@@ -12,7 +12,7 @@ from tqdm import tqdm
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def save_model_and_classes(model, class_names, path="models/country_classifier.pth"):
+def save_model_and_classes(model, class_names, path="models/updated_country_classifier.pth"):
     """
     Save the model and class names to a file.
     """
@@ -23,7 +23,7 @@ def save_model_and_classes(model, class_names, path="models/country_classifier.p
     print(f"Model and class names saved to {path}")
 
 
-def load_model_and_classes(path="models/country_classifier.pth", device=DEVICE):
+def load_model_and_classes(path="models/updated_country_classifier.pth", device=DEVICE):
     """
     Load the trained model and class names from a file.
     Automatically detects the number of classes from the checkpoint.
@@ -31,8 +31,8 @@ def load_model_and_classes(path="models/country_classifier.pth", device=DEVICE):
     checkpoint = torch.load(path, map_location=device)
     num_classes = len(checkpoint["class_names"])
 
-    # Initialize the EfficientNetV2 model without pretrained weights and update the classifier layer
-    model = efficientnet_v2_s(weights=None)
+    # Initialize EfficientNetV2-L model without pretrained weights
+    model = efficientnet_v2_l(weights=None)
     model.classifier[1] = nn.Linear(model.classifier[1].in_features, num_classes)
     model.load_state_dict(checkpoint["model_state_dict"])
     model = model.to(device)
@@ -70,13 +70,27 @@ def predict_country(model, class_names, image_tensor):
 
 def get_class_balanced_sampler(dataset):
     """
-    Automatically balance class sampling by computing weights inversely proportional
-    to class frequencies and return a WeightedRandomSampler.
+    Creates a WeightedRandomSampler that balances class distribution.
+    Fixes division by zero when a class has zero samples.
     """
-    class_counts = np.bincount(dataset.targets)
+    if isinstance(dataset, torch.utils.data.Subset):  
+        targets = [dataset.dataset.targets[i] for i in dataset.indices]
+    else:
+        targets = dataset.targets
+
+    # Count occurrences of each class
+    class_counts = np.bincount(targets, minlength=len(set(targets)))
+
+    # Avoid division by zero by setting a minimum count of 1
+    class_counts = np.where(class_counts == 0, 1, class_counts)
+
+    # Compute inverse class weights
     class_weights = 1.0 / class_counts
-    class_weights /= class_weights.sum()
-    sample_weights = [class_weights[label] for label in dataset.targets]
+    class_weights /= class_weights.sum()  # Normalize weights
+
+    # Assign weight to each sample
+    sample_weights = [class_weights[label] for label in targets]
+
     return WeightedRandomSampler(sample_weights, num_samples=len(dataset), replacement=True)
 
 
@@ -112,14 +126,14 @@ if __name__ == '__main__':
 
     # Create a balanced sampler for training data
     balanced_sampler = get_class_balanced_sampler(train_dataset)
-    train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, sampler=balanced_sampler)
-    val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE)
-    test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE)
 
-    # Initialize the model with EfficientNetV2
+    train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, sampler=balanced_sampler, num_workers=4, pin_memory=True)
+    val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, num_workers=4, pin_memory=True)
+    test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, num_workers=4, pin_memory=True)
+
+    # Initialize the model with EfficientNetV2-L
     print("Initializing model...")
-    model = efficientnet_v2_s(weights="IMAGENET1K_V1")
-    # Replace the classifier layer to match the number of classes
+    model = efficientnet_v2_l(weights="IMAGENET1K_V1")
     model.classifier[1] = nn.Linear(model.classifier[1].in_features, len(class_names))
     model = model.to(DEVICE)
 
@@ -136,8 +150,9 @@ if __name__ == '__main__':
         correct = 0
         total = 0
         pbar = tqdm(train_loader, desc=f"Training Epoch {epoch + 1}/{EPOCHS}")
+        
         for inputs, labels in pbar:
-            inputs, labels = inputs.to(DEVICE), labels.to(DEVICE)
+            inputs, labels = inputs.to(DEVICE, non_blocking=True), labels.to(DEVICE, non_blocking=True)
 
             # Forward pass
             outputs = model(inputs)
@@ -156,6 +171,7 @@ if __name__ == '__main__':
 
             # Update progress bar with current loss and accuracy
             pbar.set_postfix(Loss=running_loss / total, Accuracy=100 * correct / total)
+        
         return running_loss / len(train_loader.dataset), 100 * correct / len(train_loader.dataset)
 
     def validate():

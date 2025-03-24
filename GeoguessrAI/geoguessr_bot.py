@@ -19,7 +19,7 @@ if locator_bot_path not in sys.path:
     sys.path.append(locator_bot_path)
 
 # Import functions from LocatorBot
-from train_model import load_model_and_classes, preprocess_image, predict_country
+from train_model import load_model_and_classes, preprocess_image, predict_country, predict_country_ranked
 
 class GeoBot:
     def __init__(self, screen_regions, player=1):
@@ -119,3 +119,10 @@ class GeoBot:
 
         os.makedirs("plots", exist_ok=True)
         plt.savefig("plots/minimap.png")
+
+    def predict_local_ranked(self, screenshot: Image.Image, top_k: int = 5):
+        """
+        Predict top-k country guesses with probabilities and coordinates.
+        """
+        image_tensor = preprocess_image(screenshot).to(self.device)
+        return predict_country_ranked(self.model, self.class_names, image_tensor, top_k=top_k)
