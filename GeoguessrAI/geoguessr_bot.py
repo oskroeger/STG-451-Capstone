@@ -46,7 +46,7 @@ class GeoBot:
         # Load the trained model and class names
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model, self.class_names = load_model_and_classes(
-            path="../LocatorBot/models/country_classifier.pth",
+            path="../LocatorBot/models/top50_classifier.pth",
             device=self.device
         )
 

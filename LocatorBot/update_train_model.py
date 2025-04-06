@@ -2,7 +2,7 @@ import os
 import torch
 import torch.nn as nn
 from torchvision import transforms, datasets
-from torchvision.models import efficientnet_v2_l
+from torchvision.models import efficientnet_v2_s
 from torch.utils.data import DataLoader, random_split, WeightedRandomSampler
 from PIL import Image
 import numpy as np
@@ -12,7 +12,7 @@ from tqdm import tqdm
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def save_model_and_classes(model, class_names, path="models/updated_country_classifier.pth"):
+def save_model_and_classes(model, class_names, path="models/top50_classifier.pth"):
     """
     Save the model and class names to a file.
     """
@@ -23,7 +23,7 @@ def save_model_and_classes(model, class_names, path="models/updated_country_clas
     print(f"Model and class names saved to {path}")
 
 
-def load_model_and_classes(path="models/updated_country_classifier.pth", device=DEVICE):
+def load_model_and_classes(path="models/top50_classifier.pth", device=DEVICE):
     """
     Load the trained model and class names from a file.
     Automatically detects the number of classes from the checkpoint.
@@ -32,7 +32,7 @@ def load_model_and_classes(path="models/updated_country_classifier.pth", device=
     num_classes = len(checkpoint["class_names"])
 
     # Initialize EfficientNetV2-L model without pretrained weights
-    model = efficientnet_v2_l(weights=None)
+    model = efficientnet_v2_s(weights=None)
     model.classifier[1] = nn.Linear(model.classifier[1].in_features, num_classes)
     model.load_state_dict(checkpoint["model_state_dict"])
     model = model.to(device)
@@ -96,11 +96,11 @@ def get_class_balanced_sampler(dataset):
 
 if __name__ == '__main__':
     # Define constants
-    DATA_DIR = "./dataset/compressed_dataset"
+    DATA_DIR = "./dataset/top50_dataset"
     BATCH_SIZE = 16
     EPOCHS = 5
     LEARNING_RATE = 0.001
-    IMAGE_SIZE = (128, 128)
+    IMAGE_SIZE = (224, 224) 
 
     # Data transformations
     transform = transforms.Compose([
@@ -133,7 +133,7 @@ if __name__ == '__main__':
 
     # Initialize the model with EfficientNetV2-L
     print("Initializing model...")
-    model = efficientnet_v2_l(weights="IMAGENET1K_V1")
+    model = efficientnet_v2_s(weights="IMAGENET1K_V1")
     model.classifier[1] = nn.Linear(model.classifier[1].in_features, len(class_names))
     model = model.to(DEVICE)
 

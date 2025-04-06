@@ -111,7 +111,7 @@ def ask_license_plate_type(screenshot: Image.Image) -> str:
                     {
                         "type": "text",
                         "text": (
-                            "If there is a license plate visible, classify it into one of the following categories:\n"
+                            "Look at the license plates visible in this image. Classify the **license plate type** using one of the following categories:\n"
                             "- eu white\n"
                             "- eu yellow\n"
                             "- na standard\n"
