@@ -31,7 +31,7 @@ def load_model_and_classes(path="models/top50_classifier.pth", device=DEVICE):
     checkpoint = torch.load(path, map_location=device)
     num_classes = len(checkpoint["class_names"])
 
-    # Initialize EfficientNetV2-L model without pretrained weights
+    # Initialize EfficientNetV2-s model without pretrained weights
     model = efficientnet_v2_s(weights=None)
     model.classifier[1] = nn.Linear(model.classifier[1].in_features, num_classes)
     model.load_state_dict(checkpoint["model_state_dict"])
@@ -131,7 +131,7 @@ if __name__ == '__main__':
     val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, num_workers=4, pin_memory=True)
     test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, num_workers=4, pin_memory=True)
 
-    # Initialize the model with EfficientNetV2-L
+    # Initialize the model with EfficientNetV2-s
     print("Initializing model...")
     model = efficientnet_v2_s(weights="IMAGENET1K_V1")
     model.classifier[1] = nn.Linear(model.classifier[1].in_features, len(class_names))

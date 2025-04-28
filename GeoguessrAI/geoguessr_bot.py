@@ -89,7 +89,7 @@ class GeoBot:
         sleep(0.5)
 
         # Click on the predicted location
-        pyautogui.click(x, y, duration=0.5)
+        pyautogui.click(x, y, duration=0.5) 
 
         if plot:
             self.plot_minimap(x, y)
@@ -120,7 +120,7 @@ class GeoBot:
         os.makedirs("plots", exist_ok=True)
         plt.savefig("plots/minimap.png")
 
-    def predict_local_ranked(self, screenshot: Image.Image, top_k: int = 5):
+    def predict_local_ranked(self, screenshot: Image.Image, top_k: int = 50):
         """
         Predict top-k country guesses with probabilities and coordinates.
         """

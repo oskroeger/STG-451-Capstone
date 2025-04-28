@@ -3,6 +3,7 @@ import yaml
 import os
 import io
 import base64
+import warnings
 from time import sleep
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -10,6 +11,8 @@ from PIL import Image
 
 from select_regions import get_coords
 from geoguessr_bot import GeoBot
+
+warnings.filterwarnings("ignore", category=FutureWarning)
 
 ##############################################################################
 # Final 50 countries you care about
@@ -36,7 +39,8 @@ LICENSE_PLATE_COUNTRY_MAP = {
         # European white plates (no yellow):
         # (Note: Some of these can have alternative plates, but we keep it simple)
         "austria","belgium","bulgaria","croatia","czechia","denmark","finland","france","germany","greece",
-        "hungary","ireland","italy","lithuania","norway","poland","portugal","romania","russia","spain","sweden","switzerland"
+        "hungary","ireland","italy","lithuania","norway","poland","portugal","romania","russia","spain","sweden",
+        "switzerland", "netherlands"
     },
     "eu yellow": {
         # Typically Netherlands & UK
@@ -52,7 +56,7 @@ LICENSE_PLATE_COUNTRY_MAP = {
     },
     "asia standard": {
         # White-based plates in Asia
-        "japan","south korea","taiwan","thailand","malaysia","philippines","india","israel","cambodia"
+        "japan","south korea","taiwan","thailand","malaysia","philippines","india","israel","cambodia", "singapore"
     },
     "asia yellow": {
         # Indonesia sometimes uses black+yellow or yellow on black
@@ -72,10 +76,10 @@ ROAD_LINE_COUNTRY_MAP = {
         "united states","canada","mexico","colombia","chile","argentina","brazil","peru","south africa","kenya"
     },
     "dashed yellow": {
-        "united states","canada","mexico","colombia","argentina","chile","norway","finland","south africa","kenya","brazil"
+        "united states","canada","mexico","colombia","argentina","chile","norway","finland","south africa","kenya","brazil", "peru"
     },
     "single yellow": {
-        "argentina","peru","kenya","brazil"
+        "argentina","peru","kenya","brazil", "japan"
     },
     "dashed white": {
         # Common in left-driving or certain EU roads
@@ -93,7 +97,7 @@ ROAD_LINE_COUNTRY_MAP = {
     "no center line": set(),
     "unpaved road": {
         # Some well-known unpaved coverage
-        "kenya","botswana","argentina","peru","india","russia","brazil","mexico"
+        "kenya","botswana","argentina","peru","india","russia","brazil","mexico", "nigeria"
     },
     "ambiguous": set(),
     "no road visible": set(),
@@ -128,11 +132,12 @@ LANDSCAPE_TYPE_MAP = {
     },
     "flat": {
         "argentina", "belgium", "botswana", "brazil", "cambodia", "canada", "denmark", "hungary", "lithuania", "turkey",
-        "netherlands", "nigeria", "poland", "romania", "russia", "south africa", "united states", "united kingdom", "mexico"
+        "netherlands", "nigeria", "poland", "romania", "russia", "south africa", "united states", "united kingdom", "mexico",
+        "singapore", "france", "japan", "australia"
     },
     "hilly": {
         "brazil", "czechia", "france", "germany", "ireland", "italy", "japan", "new zealand", "philippines",
-        "portugal", "spain", "switzerland", "united kingdom", "united states"
+        "portugal", "spain", "switzerland", "united kingdom", "united states", "south africa", "peru", "singapore"
     },
     "desert": {
         "australia", "botswana", "chile", "india", "israel", "kenya", "mexico", "south africa", "united states"
@@ -153,10 +158,10 @@ VEGETATION_TYPE_MAP = {
     },
     "temperate": {
         # Seasonal climates
-        "argentina", "austria", "belgium", "bulgaria", "canada", "croatia", "czechia", "denmark",
-        "finland", "france", "germany", "hungary", "ireland", "italy", "japan", "lithuania", 
+        "argentina", "austria", "australia", "belgium", "bulgaria", "canada", "croatia", "czechia", 
+        "denmark", "finland", "france", "germany", "hungary", "ireland", "italy", "japan", "lithuania", 
         "netherlands", "new zealand", "norway", "poland", "portugal", "romania", "south korea",
-        "spain", "sweden", "switzerland", "united kingdom", "united states", "turkey"
+        "spain", "sweden", "switzerland", "united kingdom", "united states", "turkey", "peru", "russia"
     },
     "mediterranean": {
         "argentina", "australia", "france", "greece", "israel", "italy", "portugal", "spain", "turkey", 
@@ -173,22 +178,24 @@ POWER_POLE_MAP = {
     "wooden": {
         # Commonly used in rural and suburban areas
         "united states", "canada", "ireland", "united kingdom", "sweden", "norway", "new zealand",
-        "australia", "japan", "south korea", "lithuania", "finland", "philippines", "cambodia"
+        "australia", "japan", "south korea", "lithuania", "finland", "philippines", "cambodia", 
+        "south africa", "peru", "france", "romania", "hungary"
     },
 
     "concrete": {
         # Common in Latin America, Europe, and parts of Asia
         "argentina", "brazil", "chile", "colombia", "mexico", "france", "italy", "spain", "japan", "south korea",
-        "portugal", "israel", "philippines", "indonesia", "thailand", "malaysia", "poland"
+        "portugal", "israel", "philippines", "indonesia", "thailand", "malaysia", "poland", "russia"
     },
 
     "metal": {
         # More common in Eastern Europe, Russia, parts of Asia and the Middle East
         "russia", "poland", "hungary", "israel", "turkey", "romania", "czechia", "bulgaria", "india", "united states",
-        "ireland"
+        "ireland", "japan"
     },
 
-    "ambiguous": set()
+    "ambiguous": set(),
+    "no pole visible": set(),  # New category
 }
 
 BOLLARD_TYPE_MAP = {
@@ -426,10 +433,9 @@ def ask_power_pole_type(screenshot: Image.Image) -> str:
                             "- **wooden**: natural grain texture, cylindrical shape, sometimes darker or weathered\n"
                             "- **concrete**: uniform gray or white color, often thicker and more angular, may have grooves or seams\n"
                             "- **metal**: shiny or dull metal surface, thin or lattice-style, sometimes painted or galvanized\n"
-                            "- **ambiguous**: if poles are unclear, too far away, or can't be confidently identified\n\n"
-                            "Important: Only choose a category if the material is clearly identifiable. "
-                            "If it's hard to see or distinguish, return 'ambiguous'.\n\n"
-                            "Return only one category: wooden, concrete, metal, or ambiguous."
+                            "- **ambiguous**: poles are too far away, partially visible, or not easily identifiable\n"
+                            "- **no pole visible**: no utility or power pole appears in the image\n\n"
+                            "Return only one category exactly as written above."
                         )
                     },
                     {
@@ -620,7 +626,7 @@ def play_turn(bot: GeoBot, plot: bool = False):
         bot.select_map_location(default_x, default_y, plot=plot)
 
     pyautogui.press(" ")
-    sleep(5)
+    sleep(10)
 
 ##############################################################################
 # 6) MAIN
